@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { DocumentRecord, VerificationTask, GISParcel, AuditLogItem, OfficialAccountRequest, User, GovernmentSourceStatus } from '../types';
+import { DocumentRecord, VerificationTask, GISParcel, ValidatedLandDocument, AuditLogItem, OfficialAccountRequest, User, GovernmentSourceStatus } from '../types';
 
 const API_BASE = '/api';
 
@@ -105,6 +105,11 @@ export const api = {
 
   getGISParcels: async (search?: string): Promise<{ disclaimer: string; parcels: GISParcel[] }> => {
     const res = await axios.get(`${API_BASE}/gis/parcels`, { params: { search } });
+    return res.data;
+  },
+
+  getValidatedLandDocuments: async (): Promise<{ disclaimer: string; documents: ValidatedLandDocument[] }> => {
+    const res = await axios.get(`${API_BASE}/gis/validated-documents`);
     return res.data;
   },
 

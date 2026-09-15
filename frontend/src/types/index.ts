@@ -107,6 +107,25 @@ export interface GISParcel {
   polygon_coordinates: [number, number][];
 }
 
+export interface ValidatedLandDocument {
+  document_id: string;
+  filename: string;
+  digitization_status: '100% Digitized';
+  validation_status: '100% Validated';
+  location_certainty: number;
+  owner_name: string;
+  survey_number: string;
+  khata_number: string;
+  village: string;
+  taluka: string;
+  district: string;
+  area: number;
+  area_unit: string;
+  land_type?: string;
+  verified_at: string;
+  parcel: GISParcel;
+}
+
 export interface AuditLogItem {
   id: string;
   timestamp: string;

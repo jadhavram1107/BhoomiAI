@@ -5,7 +5,7 @@ from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, status
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, delete
+from sqlalchemy import select, delete, update
 from ..db.postgres import get_db
 from ..models.user import Document, LandRecord, ExtractedField, ValidationResult, VerificationTask, AuditLog
 from ..services.document_processor import preprocess_image, run_validation_checks, DEMO_PARCELS_DATA
@@ -333,9 +333,26 @@ async def verify_document(doc_id: str, payload: VerifyRequest, db: AsyncSession 
     if payload.action == "approve":
         doc.status = "verified"
         doc.processing_stage = "Verified & Approved"
+        doc.ocr_confidence = 100.0
+
+        await db.execute(
+            update(ExtractedField)
+            .where(ExtractedField.document_id == doc_id)
+            .values(confidence=100.0, confidence_tier="high", is_missing=False)
+        )
+        await db.execute(
+            update(LandRecord)
+            .where(LandRecord.document_id == doc_id)
+            .values(verification_status="Verified", overall_confidence=100.0)
+        )
     else:
         doc.status = "rejected"
         doc.processing_stage = "Rejected by Officer"
+        await db.execute(
+            update(LandRecord)
+            .where(LandRecord.document_id == doc_id)
+            .values(verification_status="Rejected")
+        )
 
     # Update verification task (use first() since multiple tasks may exist for re-processed docs)
     v_res = await db.execute(

@@ -22,10 +22,12 @@ import {
   Download,
   Copy,
   LocateFixed,
-  AlertCircle
+  AlertCircle,
+  FileCheck2,
+  ShieldCheck
 } from 'lucide-react';
 import { api } from '../services/api';
-import { GISParcel } from '../types';
+import { GISParcel, ValidatedLandDocument } from '../types';
 
 // Fix Leaflet marker icons
 delete (L.Icon.Default.prototype as any)._getIconUrl;
@@ -112,6 +114,8 @@ function getAreaSqMeters(coords: [number, number][]): number {
 
 export const GISMapPage: React.FC = () => {
   const [parcels, setParcels] = useState<GISParcel[]>([]);
+  const [validatedDocuments, setValidatedDocuments] = useState<ValidatedLandDocument[]>([]);
+  const [selectedValidatedDocument, setSelectedValidatedDocument] = useState<ValidatedLandDocument | null>(null);
   const [searchQuery, setSearchQuery] = useState('Vaijapur');
   const [activeTab, setActiveTab] = useState<'address' | 'filters' | 'id'>('address');
   const [isModalOpen, setIsModalOpen] = useState(true);
@@ -155,6 +159,7 @@ export const GISMapPage: React.FC = () => {
 
   useEffect(() => {
     fetchParcels();
+    fetchValidatedDocuments();
     autoDetectGeolocation();
   }, []);
 
@@ -217,6 +222,36 @@ export const GISMapPage: React.FC = () => {
     }
   };
 
+  const fetchValidatedDocuments = async () => {
+    try {
+      const res = await api.getValidatedLandDocuments();
+      setValidatedDocuments(res.documents);
+
+      if (res.documents.length > 0) {
+        locateFromValidatedDocument(res.documents[0], false);
+      }
+    } catch {
+      console.error('Failed to fetch validated land documents');
+    }
+  };
+
+  const locateFromValidatedDocument = (doc: ValidatedLandDocument, notify = true) => {
+    setSelectedValidatedDocument(doc);
+    setSelectedParcel(doc.parcel);
+    setSelectedGeocode(null);
+    setClickedPin(null);
+    setParcels((current) => {
+      const exists = current.some((parcel) => parcel.id === doc.parcel.id);
+      return exists ? current : [doc.parcel, ...current];
+    });
+    setMapCenter([doc.parcel.center_lat, doc.parcel.center_lng]);
+    setMapZoom(17);
+
+    if (notify) {
+      showToast(`Located Survey ${doc.survey_number} from a 100% validated digitized document.`);
+    }
+  };
+
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!searchQuery.trim()) return;
@@ -227,6 +262,7 @@ export const GISMapPage: React.FC = () => {
 
     try {
       await fetchParcels(searchQuery);
+      setSelectedValidatedDocument(null);
 
       const geoRes = await api.geocodeLocation(searchQuery);
       if (geoRes.status === 'success' && geoRes.results.length > 0) {
@@ -255,6 +291,7 @@ export const GISMapPage: React.FC = () => {
   const handleSelectGeocode = (item: any) => {
     const lat = parseFloat(item.lat);
     const lng = parseFloat(item.lon);
+    setSelectedValidatedDocument(null);
     setSelectedGeocode({
       lat,
       lng,
@@ -267,6 +304,7 @@ export const GISMapPage: React.FC = () => {
 
   const selectParcel = (p: GISParcel) => {
     setSelectedParcel(p);
+    setSelectedValidatedDocument(null);
     setSelectedGeocode(null);
     setMapCenter([p.center_lat, p.center_lng]);
     setMapZoom(16);
@@ -409,8 +447,31 @@ export const GISMapPage: React.FC = () => {
       {/* Geolocation Live Badge */}
       <div className="absolute top-3 right-4 z-20 bg-slate-900/90 backdrop-blur-md text-emerald-400 border border-emerald-500/40 text-[11px] font-semibold px-3 py-1.5 rounded-full shadow-lg flex items-center gap-1.5">
         <LocateFixed className="w-3.5 h-3.5 text-emerald-400 animate-pulse" />
-        <span>Live Reverse Geocoding & GIS Map API</span>
+        <span>Certified Document-to-GIS Location</span>
       </div>
+
+      {selectedValidatedDocument && (
+        <div className="absolute top-14 right-4 z-20 w-80 bg-white/95 backdrop-blur-md border border-emerald-200 shadow-xl rounded-2xl p-4 text-slate-800">
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <ShieldCheck className="w-5 h-5 text-emerald-600" />
+              <div>
+                <p className="text-xs font-black text-emerald-700 uppercase tracking-wide">100% Verified Source</p>
+                <p className="text-sm font-black text-slate-900">Survey {selectedValidatedDocument.survey_number}</p>
+              </div>
+            </div>
+            <span className="rounded-full bg-emerald-100 px-2.5 py-1 text-[11px] font-black text-emerald-800">
+              {selectedValidatedDocument.location_certainty}%
+            </span>
+          </div>
+          <div className="mt-3 grid grid-cols-2 gap-2 text-[11px] font-semibold">
+            <p><span className="text-slate-500">Owner</span><br />{selectedValidatedDocument.owner_name}</p>
+            <p><span className="text-slate-500">Khata</span><br />{selectedValidatedDocument.khata_number}</p>
+            <p><span className="text-slate-500">Village</span><br />{selectedValidatedDocument.village}</p>
+            <p><span className="text-slate-500">Area</span><br />{selectedValidatedDocument.area} {selectedValidatedDocument.area_unit}</p>
+          </div>
+        </div>
+      )}
 
       {/* Main Leaflet Satellite / Street Map */}
       <MapContainer
@@ -588,8 +649,8 @@ export const GISMapPage: React.FC = () => {
               : 'bg-white/95 hover:bg-white text-slate-700 border border-slate-200'
           }`}
         >
-          <Search className="w-4 h-4 text-sky-600" />
-          <span>Search & Geocode</span>
+          <FileCheck2 className="w-4 h-4 text-sky-600" />
+          <span>Validated Documents</span>
         </button>
 
         {/* Map Layers Dropdown */}
@@ -696,8 +757,8 @@ export const GISMapPage: React.FC = () => {
           {/* Modal Header */}
           <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
             <div className="flex items-center gap-2 text-slate-900 font-bold text-sm">
-              <Search className="w-4 h-4 text-sky-600" />
-              <span>Locate Land & Geocode Address</span>
+              <FileCheck2 className="w-4 h-4 text-emerald-600" />
+              <span>Locate From Validated Document</span>
             </div>
             <button
               onClick={() => setIsModalOpen(false)}
@@ -709,9 +770,66 @@ export const GISMapPage: React.FC = () => {
 
           {/* Form Content */}
           <div className="p-5 space-y-4 max-h-[calc(100vh-14rem)] overflow-y-auto">
+            <div className="space-y-3">
+              <div className="flex items-center justify-between gap-3">
+                <label className="block text-xs font-bold text-slate-700">
+                  100% validated & digitized land documents
+                </label>
+                <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-black text-emerald-800">
+                  {validatedDocuments.length} ready
+                </span>
+              </div>
+
+              {validatedDocuments.length > 0 ? (
+                <div className="space-y-2">
+                  {validatedDocuments.map((doc) => {
+                    const isActive = selectedValidatedDocument?.document_id === doc.document_id;
+                    return (
+                      <button
+                        key={doc.document_id}
+                        type="button"
+                        onClick={() => locateFromValidatedDocument(doc)}
+                        className={`w-full text-left rounded-xl border p-3 transition-all ${
+                          isActive
+                            ? 'border-emerald-400 bg-emerald-50 ring-2 ring-emerald-300/40'
+                            : 'border-slate-200 bg-white hover:bg-slate-50'
+                        }`}
+                      >
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <p className="truncate text-xs font-black text-slate-900">
+                              Survey {doc.survey_number} - {doc.village}
+                            </p>
+                            <p className="mt-0.5 truncate text-[11px] font-semibold text-slate-600">
+                              {doc.owner_name} | Khata {doc.khata_number}
+                            </p>
+                          </div>
+                          <span className="shrink-0 rounded-full bg-emerald-600 px-2 py-0.5 text-[10px] font-black text-white">
+                            100%
+                          </span>
+                        </div>
+                        <div className="mt-2 flex items-center justify-between gap-2 text-[10px] font-bold text-slate-500">
+                          <span>{doc.digitization_status}</span>
+                          <span>{doc.validation_status}</span>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs font-semibold text-amber-800">
+                  <div className="flex items-start gap-2">
+                    <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+                    <span>No land document is ready for GIS location yet. Approve a digitized document after validation to enable 100% sure map location.</span>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="border-t border-slate-100 pt-4">
             <form onSubmit={handleSearch} className="space-y-3">
               <label className="block text-xs font-bold text-slate-700">
-                Search Geolocation (Address, City, Village, District)
+                Fallback Search (Address, City, Village, District)
               </label>
               <div className="relative">
                 <input
@@ -741,6 +859,7 @@ export const GISMapPage: React.FC = () => {
                 {loading || geocoding ? 'Geocoding...' : 'Search Location API'}
               </button>
             </form>
+            </div>
 
             {/* Geocoded Results */}
             {geocodeResults.length > 0 && (
