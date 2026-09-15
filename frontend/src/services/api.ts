@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { DocumentRecord, VerificationTask, GISParcel, ValidatedLandDocument, AuditLogItem, OfficialAccountRequest, User, GovernmentSourceStatus } from '../types';
+import { DocumentRecord, VerificationTask, VerificationAssignmentPayload, GISParcel, ValidatedLandDocument, AuditLogItem, OfficialAccountRequest, User, GovernmentSourceStatus } from '../types';
 
 const API_BASE = '/api';
 
@@ -100,6 +100,11 @@ export const api = {
 
   getVerificationQueue: async (): Promise<VerificationTask[]> => {
     const res = await axios.get(`${API_BASE}/verification/queue`);
+    return res.data;
+  },
+
+  assignVerificationTask: async (taskId: string, payload: VerificationAssignmentPayload) => {
+    const res = await axios.post(`${API_BASE}/verification/queue/${taskId}/assign`, payload);
     return res.data;
   },
 

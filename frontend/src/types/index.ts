@@ -84,6 +84,20 @@ export interface VerificationTask {
   created_at: string;
   reviewed_by?: string;
   reviewer_comment?: string;
+  assigned_officer_level?: string;
+  assigned_officer_label?: string;
+  assigned_department?: string;
+  assigned_department_label?: string;
+  assigned_by?: string;
+  routing_remarks?: string;
+  verification_step?: string;
+}
+
+export interface VerificationAssignmentPayload {
+  officer_level: string;
+  department: string;
+  assigned_by?: string;
+  remarks?: string;
 }
 
 export interface GISParcel {
